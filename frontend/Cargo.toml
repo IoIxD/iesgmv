@@ -1,5 +1,5 @@
 [package]
-name = "rustboyadvance-sdl2"
+name = "iesgmv"
 version = "0.1.0"
 authors = ["Michel Heily <michelheily@gmail.com>"]
 edition = "2024"

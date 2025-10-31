@@ -25,8 +25,6 @@ use rustboyadvance_utils::FpsCounter;
 
 use rustboyadvance_core::cartridge::loader::{LoadRom, load_from_file};
 
-const LOG_DIR: &str = ".logs";
-
 fn ask_download_bios() {
     const OPEN_SOURCE_BIOS_URL: &str =
         "https://github.com/Nebuleon/ReGBA/raw/master/bios/gba_bios.bin";
@@ -48,11 +46,9 @@ fn load_bios(bios_path: &Path) -> Box<[u8]> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    fs::create_dir_all(LOG_DIR)
-        .unwrap_or_else(|_| panic!("could not create log directory ({})", LOG_DIR));
     flexi_logger::Logger::try_with_env_or_str("info")
         .unwrap()
-        .log_to_file(FileSpec::default().directory(LOG_DIR))
+        // .log_to_file(FileSpec::default().directory(LOG_DIR))
         .duplicate_to_stderr(Duplicate::Debug)
         .format_for_files(default_format)
         .format_for_stderr(colored_default_format)

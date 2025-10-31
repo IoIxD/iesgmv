@@ -786,6 +786,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "iesgmv"
+version = "0.1.0"
+dependencies = [
+ "bit",
+ "bytesize",
+ "clap",
+ "flexi_logger",
+ "log",
+ "rustboyadvance-core",
+ "rustboyadvance-utils",
+ "sdl2",
+ "spin_sleep",
+ "winres",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1342,22 +1358,6 @@ dependencies = [
  "xml-builder",
  "yaml-rust",
  "zip",
-]
-
-[[package]]
-name = "rustboyadvance-sdl2"
-version = "0.1.0"
-dependencies = [
- "bit",
- "bytesize",
- "clap",
- "flexi_logger",
- "log",
- "rustboyadvance-core",
- "rustboyadvance-utils",
- "sdl2",
- "spin_sleep",
- "winres",
 ]
 
 [[package]]
