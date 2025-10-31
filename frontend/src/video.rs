@@ -32,9 +32,6 @@ pub fn init(sdl_context: &Sdl) -> Result<Renderer<'_>, Box<dyn std::error::Error
         .resizable()
         .build()?;
 
-    let window_icon = Surface::from_file("assets/icon.png")?;
-    window.set_icon(window_icon);
-
     let mut canvas = window.into_canvas().accelerated().build()?;
     canvas.set_logical_size(SCREEN_WIDTH, SCREEN_HEIGHT)?;
 

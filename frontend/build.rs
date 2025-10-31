@@ -8,10 +8,6 @@ use winres;
 
 #[cfg(windows)]
 fn main() {
-    let mut res = winres::WindowsResource::new();
-    res.set_icon("../../assets/icon.ico");
-    res.compile().unwrap();
-
     let target = env::var("TARGET").unwrap();
     if target.contains("pc-windows") {
         let manifest_dir = PathBuf::from(
