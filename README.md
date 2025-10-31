@@ -10,9 +10,14 @@ It also struggles to reach 60fps because it has to call to Lua so much, I've tri
 
 # usage
 
-Basically you create a Lua script with functions that can intercept any reads/writes to memory, and you can log them or swap out values as you please. Either function can be excluded.
+Basically you create a Lua script with functions that can intercept any reads/writes to memory, and you can log them or swap out values as you please.
 
-Both functions return a boolean to signify whether to actually intercept the read/write. Returning false means that whatever memory address was supposed to be read/written will be done so on the emulator, returning true (naturally) means otherwise. On the read callback specifically, you also have to return the value that should be read, even if you're not intercepting (just return `0, false` for that)
+- The read callback is expected to have the name `on_read` and will take the address being read from (unfiltered) as an argument, and is expected to return both the value that you want to intercept for that read call, and a boolean (whose purpose is described below)
+- The write callback is expected to have the name `on_write` and will take the address being written to, with the value that's supposed to be written to it. It's expected to return a boolean (whose purpose is described below).
+
+**Make sure your functions take those exact parameters and return those exact things, failure to do so could result in a crash**
+
+Both functions return a boolean to signify whether to actually intercept the read/write. Returning false means that whatever memory address was supposed to be read/written will be done so on the emulator and your other return value is ignored. Returning true (naturally) means otherwise. On the read callback specifically, you also have to return the value that should be read, even if you're not intercepting (just return `0, false` for that)
 
 Example:
 
