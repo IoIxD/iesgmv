@@ -1,8 +1,9 @@
-/target
+target
 **/*.rs.bk
-/*.lib
-/*.dll
-/*.bin
-/*.gba
-
-/.logs
+*.lib
+*.dll
+*.bin
+*.gba
+*.sav
+scripts
+.logs

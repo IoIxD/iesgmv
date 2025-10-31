@@ -72,6 +72,7 @@ impl GameBoyAdvance {
         bios_rom: Box<[u8]>,
         gamepak: Cartridge,
         audio_interface: DynAudioInterface,
+        lua_path: String,
     ) -> GameBoyAdvance {
         // Warn the user if the bios is not the real one
         match check_real_bios(&bios_rom) {
@@ -103,6 +104,7 @@ impl GameBoyAdvance {
             io_devs.clone(),
             bios_rom,
             gamepak,
+            lua_path,
         ));
 
         let cpu = Box::new(Arm7tdmiCore::new(sysbus.clone()));
@@ -127,6 +129,7 @@ impl GameBoyAdvance {
         bios: Box<[u8]>,
         rom: Box<[u8]>,
         audio_interface: DynAudioInterface,
+        lua_path: String,
     ) -> Result<GameBoyAdvance, bincode::error::DecodeError> {
         let (decoded, _n): (Box<SaveState>, usize) =
             bincode::serde::borrow_decode_from_slice(savestate, CONFIG)?;
@@ -145,6 +148,7 @@ impl GameBoyAdvance {
             bios,
             decoded.ewram,
             decoded.iwram,
+            lua_path,
         ));
         let mut arm7tdmi = Box::new(Arm7tdmiCore::from_saved_state(
             sysbus.clone(),
@@ -460,7 +464,7 @@ mod tests {
             .without_backup_to_file()
             .build()
             .unwrap();
-        let mut gba = GameBoyAdvance::new(bios, cartridge, NullAudio::new());
+        let mut gba = GameBoyAdvance::new(bios, cartridge, NullAudio::new(), "".to_string());
         gba.skip_bios();
 
         gba

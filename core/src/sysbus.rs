@@ -1,3 +1,7 @@
+use std::env::current_dir;
+use std::rc::Rc;
+
+use mlua::Function;
 use serde::{Deserialize, Serialize};
 
 use super::arm7tdmi::memory::{
@@ -157,6 +161,11 @@ pub struct SysBus {
     cycle_luts: CycleLookupTables,
 
     pub trace_access: bool,
+
+    pub(crate) lua_state: mlua::Lua,
+
+    lua_cb_read: Rc<dyn LuaCallbackRead>,
+    lua_cb_write: Rc<dyn LuaCallbackWrite>,
 }
 
 pub type SysBusPtr = WeakPointer<SysBus>;
@@ -168,6 +177,76 @@ impl SchedulerConnect for SysBus {
     }
 }
 
+trait LuaCallbackRead {
+    fn read_32(&self, addr: u32) -> (u32, bool);
+    fn read_16(&self, addr: u32) -> (u16, bool);
+    fn read_8(&self, addr: u32) -> (u8, bool);
+}
+trait LuaCallbackWrite {
+    fn write_32(&self, addr: u32, value: u32) -> bool;
+    fn write_16(&self, addr: u32, value: u16) -> bool;
+    fn write_8(&self, addr: u32, value: u8) -> bool;
+}
+
+struct DummyCallback;
+struct SoulfulCallback(Function);
+
+impl LuaCallbackRead for DummyCallback {
+    fn read_32(&self, addr: u32) -> (u32, bool) {
+        (0, false)
+    }
+
+    fn read_16(&self, addr: u32) -> (u16, bool) {
+        (0, false)
+    }
+
+    fn read_8(&self, addr: u32) -> (u8, bool) {
+        (0, false)
+    }
+}
+
+impl LuaCallbackWrite for DummyCallback {
+    fn write_32(&self, addr: u32, value: u32) -> bool {
+        false
+    }
+
+    fn write_16(&self, addr: u32, value: u16) -> bool {
+        false
+    }
+
+    fn write_8(&self, addr: u32, value: u8) -> bool {
+        false
+    }
+}
+
+impl LuaCallbackRead for SoulfulCallback {
+    fn read_32(&self, addr: u32) -> (u32, bool) {
+        unsafe { self.0.call(addr).unwrap_unchecked() }
+    }
+
+    fn read_16(&self, addr: u32) -> (u16, bool) {
+        unsafe { self.0.call(addr).unwrap_unchecked() }
+    }
+
+    fn read_8(&self, addr: u32) -> (u8, bool) {
+        unsafe { self.0.call(addr).unwrap_unchecked() }
+    }
+}
+
+impl LuaCallbackWrite for SoulfulCallback {
+    fn write_32(&self, addr: u32, value: u32) -> bool {
+        unsafe { self.0.call((addr, value)).unwrap_unchecked() }
+    }
+
+    fn write_16(&self, addr: u32, value: u16) -> bool {
+        unsafe { self.0.call((addr, value)).unwrap_unchecked() }
+    }
+
+    fn write_8(&self, addr: u32, value: u8) -> bool {
+        unsafe { self.0.call((addr, value)).unwrap_unchecked() }
+    }
+}
+
 impl SysBus {
     pub fn new_with_memories(
         scheduler: Shared<Scheduler>,
@@ -176,11 +255,27 @@ impl SysBus {
         bios_rom: Box<[u8]>,
         ewram: Box<[u8]>,
         iwram: Box<[u8]>,
+        lua_path: String,
     ) -> SysBus {
         let mut luts = CycleLookupTables::default();
         luts.init();
         luts.update_gamepak_waitstates(io.waitcnt);
 
+        let lua_state = mlua::Lua::new();
+        let path = current_dir().unwrap().join(lua_path);
+        lua_state.load(path.clone()).exec().unwrap();
+
+        let g = lua_state.globals();
+
+        let lua_cb_read: Rc<dyn LuaCallbackRead> = match g.get::<Function>("on_read") {
+            Ok(a) => Rc::new(SoulfulCallback(a)),
+            Err(_) => Rc::new(DummyCallback),
+        };
+
+        let lua_cb_write: Rc<dyn LuaCallbackWrite> = match g.get::<Function>("on_write") {
+            Ok(a) => Rc::new(SoulfulCallback(a)),
+            Err(_) => Rc::new(DummyCallback),
+        };
         SysBus {
             io,
             scheduler,
@@ -192,6 +287,9 @@ impl SysBus {
             iwram,
             cycle_luts: luts,
             trace_access: false,
+            lua_state,
+            lua_cb_read,
+            lua_cb_write,
         }
     }
 
@@ -200,10 +298,11 @@ impl SysBus {
         io: Shared<IoDevices>,
         bios_rom: Box<[u8]>,
         cartridge: Cartridge,
+        lua_path: String,
     ) -> SysBus {
         let ewram = vec![0; WORK_RAM_SIZE].into_boxed_slice();
         let iwram = vec![0; INTERNAL_RAM_SIZE].into_boxed_slice();
-        SysBus::new_with_memories(scheduler, io, cartridge, bios_rom, ewram, iwram)
+        SysBus::new_with_memories(scheduler, io, cartridge, bios_rom, ewram, iwram, lua_path)
     }
 
     pub fn set_ewram(&mut self, buffer: Box<[u8]>) {
@@ -308,8 +407,11 @@ impl SysBus {
 
 /// Todo - implement bound checks for EWRAM/IWRAM
 impl BusIO for SysBus {
-    #[inline]
     fn read_32(&mut self, addr: Addr) -> u32 {
+        let (val, ret) = self.lua_cb_read.read_32(addr);
+        if ret {
+            return val;
+        }
         match addr & 0xff000000 {
             BIOS_ADDR => {
                 if addr <= 0x3ffc {
@@ -338,8 +440,11 @@ impl BusIO for SysBus {
         }
     }
 
-    #[inline]
     fn read_16(&mut self, addr: Addr) -> u16 {
+        let (val, ret) = self.lua_cb_read.read_16(addr);
+        if ret {
+            return val;
+        }
         match addr & 0xff000000 {
             BIOS_ADDR => {
                 if addr <= 0x3ffe {
@@ -368,8 +473,11 @@ impl BusIO for SysBus {
         }
     }
 
-    #[inline]
     fn read_8(&mut self, addr: Addr) -> u8 {
+        let (val, ret) = self.lua_cb_read.read_8(addr);
+        if ret {
+            return val;
+        }
         match addr & 0xff000000 {
             BIOS_ADDR => {
                 if addr <= 0x3fff {
@@ -398,8 +506,10 @@ impl BusIO for SysBus {
         }
     }
 
-    #[inline]
     fn write_32(&mut self, addr: Addr, value: u32) {
+        if self.lua_cb_write.write_32(addr, value) {
+            return;
+        }
         match addr & 0xff000000 {
             BIOS_ADDR => {}
             EWRAM_ADDR => self.ewram.write_32(addr & 0x3_fffc, value),
@@ -423,8 +533,10 @@ impl BusIO for SysBus {
         }
     }
 
-    #[inline]
     fn write_16(&mut self, addr: Addr, value: u16) {
+        if self.lua_cb_write.write_16(addr, value) {
+            return;
+        }
         match addr & 0xff000000 {
             BIOS_ADDR => {}
             EWRAM_ADDR => self.ewram.write_16(addr & 0x3_fffe, value),
@@ -448,8 +560,10 @@ impl BusIO for SysBus {
         }
     }
 
-    #[inline]
     fn write_8(&mut self, addr: Addr, value: u8) {
+        if self.lua_cb_write.write_8(addr, value) {
+            return;
+        }
         match addr & 0xff000000 {
             BIOS_ADDR => {}
             EWRAM_ADDR => self.ewram.write_8(addr & 0x3_ffff, value),
