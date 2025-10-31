@@ -1,5 +1,3 @@
 {
-    "diagnostics.globals": [
-        "on_read"
-    ]
+  "diagnostics.globals": ["on_read", "on_write"]
 }
