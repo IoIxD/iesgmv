@@ -19,19 +19,24 @@ Basically you create a Lua script with functions that can intercept any reads/wr
 
 Both functions return a boolean to signify whether to actually intercept the read/write. Returning false means that whatever memory address was supposed to be read/written will be done so on the emulator and your other return value is ignored. Returning true (naturally) means otherwise. On the read callback specifically, you also have to return the value that should be read, even if you're not intercepting (just return `0, false` for that)
 
-Example:
+Example script that prints out an address write any time that its changed:
 
 ```lua
+local already_read = {}
+
 ---@param addr number The address we're reading from in game memory
 function on_read(addr)
-    print(addr)
+    -- print(addr)
     return 0, false
 end
 
 ---@param addr number The address we're writing to in game memory
 ---@param value number The value expected to be written to this address
 function on_write(addr, value)
-    print(addr, value)
+    if already_read[addr] ~= value then
+        print(string.format("%0X", addr - 0x02020EE0), value)
+        already_read[addr] = value
+    end
     return false
 end
 ```

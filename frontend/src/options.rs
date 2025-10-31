@@ -21,10 +21,6 @@ pub struct Options {
     #[arg(long, default_value = "gba_bios.bin")]
     pub bios: PathBuf,
 
-    /// Skip running the bios boot animation and jump straight to the ROM
-    #[arg(long)]
-    pub skip_bios: bool,
-
     /// Do not output sound
     #[arg(long)]
     pub _silent: bool,
